@@ -85,10 +85,10 @@ print(modFit$finalModel)
 plot(modFit$finalModel,pch=19,cex=0.5,main="Trees number against Error Rate")
 ```  
 
-Readers could see that the error rate is very slow at 0.33% and only 46 wrong manner predicted in a 13737- row training set.
+Readers could see that the error rate is very slow at 0.33% and only 44 wrong manner predicted in a 13737- row training set.
   
 ###Cross validation
-The predicted model gotten from step above will be used directly for the testing dataset to carry out cross validation, or to say test how the model performs.
+The predicted model gotten from step above will be used directly for the testing dataset to carry out cross validation, or to say test how the model performs. With a high accuracy from trainning dataset, the author expected that the accuracy rate still be at a high rate over 99%, that's because the sclicing method randomly to choose observations.
 
 ```{r, echo = TRUE, results="hide", fig.width=6, fig.height = 4}
 pred <- predict(modFit,testingLast)# use the model modFit to predict against testing data.
@@ -97,7 +97,7 @@ pred <- predict(modFit,testingLast)# use the model modFit to predict against tes
 testingLast$predRight <- pred==testingLast$classe # Add a new column for correct predicted cases
 table(pred,testingLast$classe) # display the correct table
 ```  
-Again, the accuracy rate is very high and error rate is very low, with only 8 worng predicts in 5885 cases (error rate=0.0136%), which boost confidence to go to the final step. And now it looks that the initial acuracy/error estimate is too conservative, with Random Forest technique, this prediction resule is over 99% accurate.
+Again, the accuracy rate is very high and error rate is very low, with only 3 worng predicts in 5885 cases (error rate=0.0051%), which confirmed author's expected and boost confidence to go to the final step. And now it looks that the initial acuracy/error estimate is too conservative, with Random Forest technique, this prediction results are over 99% accurate.
 
 Here, the author do more with another slicing/cross validation technique named K-fold with trainingLast data set.
 ```{r, echo = TRUE, fig.width=6, fig.height = 4,cache=TRUE}
