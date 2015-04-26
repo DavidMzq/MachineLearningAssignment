@@ -1,0 +1,125 @@
+---
+title: "Predict manner from barbell lifts activity recorded by accelerometers"
+author: "David Zhiqiang MA Adam"
+date: "Friday, April 24, 2015"
+output: html_document
+---
+###Overview
+Using wearable devices such as Jawbone Up, Nike FuelBand, and Fitbit now very easily give us an posibility to collect a large amount of data about personal activity and which then can be analyzed for business or healthcare research usage.
+  
+In this paper, the author will intorduce one of the most accuracy Machine Learning technique named "Random Forest" to demo a medium sized but overall process of analyzing of realistic data acquired from several volunteers. During data collected, accelerometers were attached on the belt, forearm, arm, and dumbell of 6 participants who were asked to perform barbell lifts correctly and incorrectly in 5 different ways.
+
+With the [data](https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv) and [test data](https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv), the factor column classe contians 5 manner lettered from A through E and only A represents the correct manner. More information is available from the HAR  website [here](http://groupware.les.inf.puc-rio.br/har) (see the section on the Weight Lifting Exercise Dataset).
+
+### Executive Summary
+The whole analysis process includs 4 sections, in order of: Data Cleaning, Data Manipulating, Machine Learning Prediction, Cross Validation, Predicting against 20 real test data cases. 
+
+### Data Cleaning:
+In this step, the original testing data read into a variable of R language, and then it's splitted again into a training dataset(70% observations) used for creating predict model and testing dataset(30% observations) for cross validation.
+Since some variables(columns) are not useful for the predict purpose, they should be removed for efficiency purpose and also for removing possible overfitting posibility.
+
+```{r, echo = TRUE, fig.width=6, fig.height = 4}
+Sys.setlocale(locale = "English")
+library(caret); library(kernlab);
+#Read data into variable
+TrainDataOri<-read.table("pml-training.csv",header=TRUE,sep=",",na.strings="NA")
+#Create sub-training and sub-test dataset
+inTrain <- createDataPartition(TrainDataOri$classe,p=0.7, list=FALSE)
+training <- TrainDataOri[inTrain,]
+testing <- TrainDataOri[-inTrain,]
+#remove columns
+# 1.remove derivative volumns which with prefix max_, kurtosis_, skewness_, min_, var_, avg_, stddev_
+testingNew <- testing[,!grepl("max_|min_|kurtosis_|skewness_|var_|avg_|stddev_",names(testing))]
+trainingNew <- training[,!grepl("max_|min_|kurtosis_|skewness_|var_|avg_|stddev_",names(training))]
+# 2.remove row number and user name
+testingNew <- testingNew[ , !names(testingNew) %in% c("X","user_name")]
+trainingNew <- trainingNew[ , !names(trainingNew) %in% c("X","user_name")]
+# 3.remove timestamp
+testingNew <- testingNew[,!grepl("timestamp",names(testingNew))]
+trainingNew <- trainingNew[,!grepl("timestamp",names(trainingNew))]
+# 4.remove columns which are empty in test dataset(columns with prefix amplitude), avoiding unnecessary unmatching occur.
+testingNew <- testingNew[,!grepl("amplitude_",names(testingNew))]
+trainingNew <- trainingNew[,!grepl("amplitude_",names(trainingNew))]
+```  
+### Data Manipulating:
+In this step, fill up those empty values (NA) anywhere in the dataset to meet Machine Learning predict's requirement. To acchieve this, will use functions in package impute which only works on number columns, so need to do some minipulation on original dataset and then combine them together after treated.
+```{r, echo = TRUE,,results="hide", fig.width=6, fig.height = 4}
+trainingNew1<-trainingNew[,c("new_window","classe")]#only 2 factor columns in the new matrix trainingNew1
+trainingNew2<- trainingNew[,!grepl("new_window|classe",names(trainingNew))] #all other numeric columns into trainingNew2 which will be treated via imputaing.
+#Run command below to install it if run it first time.
+#source("http://bioconductor.org/biocLite.R")
+#biocLite("impute") #install impute package
+library(impute)
+imputed<-impute.knn(as.matrix(trainingNew2) ,k = 10, rowmax = 0.5, colmax = 0.99, maxp = 1500)
+trainingNew2<-imputed$data
+trainingLast<-cbind(trainingNew1,trainingNew2) # get final training dataset trainingLast
+#do same for testing dataset
+testingNew1<-testingNew[,c("new_window","classe")]
+testingNew2<- testingNew[,!grepl("new_window|classe",names(testingNew))] 
+imputedTest<-impute.knn(as.matrix(testingNew2) ,k = 10, rowmax = 0.5, colmax = 0.99, maxp = 1500)
+testingNew2<-imputedTest$data
+testingLast<-cbind(testingNew1,testingNew2)
+```  
+###Machine Learning Prediction
+Before conducting prediction with Random Forest, here is a plot shows relationship between one variable accel_forearm_x and the manner.
+```{r, echo = TRUE, fig.width=6, fig.height = 4,cache=TRUE}
+qplot(accel_forearm_x ,accel_forearm_y,colour=classe,data=training,main="Predictor with Manner")
+```
+Looks none pattern there, in fact after trying alomost all variables from sensors, no obvious pattern observed which reminds us, that for this kind of complicated multiple variables' predict Machine Learning techniques works better than human being's intuition.
+
+Since the HAR got an averaged accuracy rate of 78.8% (0.78+0.74+0.77+0.86+0.79)/5, see [here](http://groupware.les.inf.puc-rio.br/har), so before carrying out this predicting with Random Forest, the author expected the result of accuracy rate maybe at about 80 through 90 percent, or a little better.
+```{r, echo = TRUE, fig.width=6, fig.height = 4,cache=TRUE}
+set.seed(137) # set seed for reproducible research purpose
+fitControl <- trainControl(method = "none")
+tgrid <- expand.grid(mtry=c(6))
+modFit <- train(classe~ .,data=trainingLast,method="rf",prox=TRUE,trControl = fitControl, tuneGrid=tgrid) #method="rf" represents "Random forest" used.
+
+#Show the predict accuracy distribution and error rate:
+print(modFit$finalModel)
+#Plot to show the relationship between decision trees number with Error rate.
+plot(modFit$finalModel,pch=19,cex=0.5,main="Trees number against Error Rate")
+```  
+
+Readers could see that the error rate is very slow at 0.38% and only 52 wrong manner predicted in a 13737- row training set.
+###Cross validation
+The predicted model gotten from step above will be used directly for the testing dataset to carry out cross validation, or to say test how the model performs.
+
+```{r, echo = TRUE, fig.width=6, fig.height = 4}
+pred <- predict(modFit,testingLast)# use the model modFit to predict against testing data.
+testingLast$predRight <- pred==testingLast$classe # Add a new column for correct predicted cases
+table(pred,testingLast$classe) # display the correct table
+```  
+Again, the accuracy rate is very high and error rate is very low, with only 17 worng predicts in 5885 cases, which boost confidence to go to the final step. And now it looks that the initial acuracy/error estimate is too conservative, with Random Forest technique, this prediction resule is over 99% accurate.
+
+Here, the author do more with another slicing/cross validation technique named K-fold with trainingLast data set.
+```{r, echo = TRUE, fig.width=6, fig.height = 4,cache=TRUE}
+folds <- createFolds(y=trainingLast$classe,k=10, list=TRUE,returnTrain=TRUE) #get returned dataset for sub-training, K=10 means slicing trainingLast into 10 sub-groups and will take each of these groups as testing set one by one. 
+#Here, only the group1 will be demonstrated.
+modFitK10_1 <- train(classe~ .,data=trainingLast[folds[[1]],],method="rf",prox=TRUE,trControl = fitControl, tuneGrid=tgrid) #predict on the first group(9/10 observations) 
+
+#Show the predict accuracy distribution and error rate:
+print(modFitK10_1$finalModel)
+testK10_1<-trainingLast[-folds[[1]],]#remnant observations in the orginal training dataset(trainingLast) to be testing data.
+dim(testK10_1)# display the testing dataset observations from k-folded steps.
+predK10_1 <- predict(modFitK10_1,testK10_1)
+# use the model modFit to predict against the 
+testK10_1$predRight <- predK10_1==testK10_1$classe # Add a new column for correct predicted cases
+table(predK10_1,testK10_1$classe) # display the correct table
+```
+As observed, the accuracy rates of both training and testing data are even higher, the other groups get the same results and readers could implement that themselves.
+Let's end the cross validation with a plot shows those wrong cases among all cases(use the same variable as the first exploratory plot).
+```{r, echo = TRUE, fig.width=6, fig.height = 4,cache=TRUE}
+qplot(accel_forearm_x ,accel_forearm_y,colour=predRight,data=testingLast,main="newdata Predictions")
+```
+###Predicting against 20 real test data cases
+This is actually just like the cross validation part but with a new testing dataset. Anyway, the code is listed without prediction result.
+```{r, echo = TRUE, fig.width=6, fig.height = 4}
+TestFile20<-read.table("pml-testing.csv",header=TRUE,sep=",",na.strings="NA")
+pred20 <- predict(modFit,newdata=TestFile20)
+TestFile20$classe <- pred20 # Add the results as a new column which culd be compared with real values.
+``` 
+Fantastic, all 20 cases were correctly predicted.  
+
+###Conclusion
+Random Forest is really a good Machine Learning technique with high accuracy rate, which impressed the author so much. Readers could find more detailed knowledge about it [here](http://www.stat.berkeley.edu/~breiman/RandomForests/cc_home.htm) from website of University of California,Berkley, Deportment of Statistic.
+
