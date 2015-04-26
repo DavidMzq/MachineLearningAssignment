@@ -159,7 +159,7 @@ plot(modFit$finalModel,pch=19,cex=0.5,main=&quot;Trees number against Error Rate
 </div>
 <div id="cross-validation" class="section level3">
 <h3>Cross validation</h3>
-<p>The predicted model gotten from step above will be used directly for the testing dataset to carry out cross validation, or to say test how the model performs. With a high accuracy from trainning dataset, the author expected that the accuracy rate still be at a high rate over 99%, that’s because the sclicing method randomly to choose observations.</p>
+<p>The predicted model gotten from step above will be used directly for the testing dataset to carry out cross validation, or to say test how the model performs. With a high accuracy from trainning dataset, the author expected that the accuracy rate still be at a high rate over 99%, that's because the sclicing method randomly to choose observations.</p>
 <pre class="r"><code>pred &lt;- predict(modFit,testingLast)# use the model modFit to predict against testing data.</code></pre>
 <pre><code>## Loading required package: randomForest
 ## randomForest 4.6-10
